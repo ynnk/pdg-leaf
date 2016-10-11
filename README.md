@@ -14,9 +14,13 @@ There is about 2100 strains in db
 
   $ curl --get https://www.lealy.com/indica/northern-lights -H X-Requested-With:XMLHttpRequest -H accept:application/json
 
+## Install requirements
 
+$ pip install -r requirements.txt
 
 ## Dump
+
+Crawl json data
 
 $ python dump.py
 
