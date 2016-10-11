@@ -18,6 +18,8 @@ There is about 2100 strains in db
 
 ## Dump
 
+$ python dump.py
+
 ## Build Graph
 
 ## Padagraph Bot
