@@ -1,30 +1,30 @@
-#!/usr/bin/env python
-#-*- coding:utf-8 -*-
-
-USAGE = """
-dumps data from https://www.leafly.com
-
-$ python dump.py
-
-"""
-import sys
-import argparse
+import shelve
 import requests
 import requests_cache
 
-cache = requests_cache.backends.sqlite.DbCache('leafly_cache')
-requests_cache.install_cache('leafly_cache')
+#cache = requests_cache.backends.sqlite.DbCache('leafly_cache')
+#requests_cache.install_cache('leafly_cache')
 
 root = "https://www.leafly.com"
 headers =  {'accept': 'application/json'}
 
 def dump_strains():
+    """ fetch strains catalogue """
 
     all_strains = []
     url = "%s/explore/sort-alpha" % root
     islastpage = False
     
-
+    def isStrain(strain):
+        validators = [
+          strain is not None,
+          type(strain) == dict,
+          strain['DisplayCategory'] != "Edible",
+          'Name' in strain,   
+        ]
+        return all(validators)
+        
+        
     while islastpage == False:
 
         print "requesting %s " % url
@@ -35,21 +35,21 @@ def dump_strains():
         model = data['Model']
 
         url = "%s%s" % (root, model['NextPageUrl'])
-        islastpage = model['PagingContext']['IsLastPage'] 
-        strains = model['Strains']
-        strains = filter( lambda x : x['DisplayCategory'] != "Edible", strains )
+        islastpage = model['PagingContext']['IsLastPage']         
+        strains = filter( isStrain, model['Strains'] )
 
         all_strains.extend(strains)
 
-        print "adding %s strains, %s in db" % ( len(strains),len(all_strains) )
-    
-
+        print "adding %s strains (%s), %s in db" % ( len(strains), len(model['Strains']), len(all_strains) )
     
     return all_strains
 
 
 def expand_strains(strains):
     """
+    get json data for each strain.
+    ( lignage, effects, comments, rating ... )
+    
     DisplayCategory in [ Hybrid sativa indica ]
     url = https://www.leafly.com/DisplayCategory/UrlName
     """
@@ -67,23 +67,9 @@ def expand_strains(strains):
             print "error"
     return strains
 
-
-        
-def main():
-    """ Function doc
-    :param : 
-    """
-    parser = argparse.ArgumentParser(prog="main")
-    parser.add_argument("--option", action='store_true',help="")
-    args = parser.parse_args()
-    
-
-    strains = dump_strains()
-    
-    strains = expand_strains(strains)
-    
-    
-if __name__ == '__main__':
-    sys.exit(main())
-
-
+def saveAs(strains, path):
+    """ saves strains to a shelve db """
+    db = shelve.open(path)    
+    for strain in strains:
+        db[str(strain['UrlName'])] = strain
+    db.close()

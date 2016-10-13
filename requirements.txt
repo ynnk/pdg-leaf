@@ -1,0 +1,7 @@
+requests
+requests_cache
+python-igraph
+
+https://github.com/padagraph/botapi/archive/master.zip
+https://github.com/kodexlab/reliure/archive/master.zip
+git+ssh://git@git.kodexlab.com/kodexlab/cello.git@no_matplotlib
