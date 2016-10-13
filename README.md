@@ -8,23 +8,38 @@ None is available, but one can request json data exploring strains
 
 There is about 2100 strains in db
   
-  $ curl  https://www.leafly.com/explore/page-44 -H X-Requested-With:XMLHttpRequest -H accept:application/json
+  $ curl  https://www.leafly.com/explore/page-44 -H accept:application/json
 
 ### Get json data for a specfied strain
 
-  $ curl --get https://www.lealy.com/indica/northern-lights -H X-Requested-With:XMLHttpRequest -H accept:application/json
+  $ curl --get https://www.lealy.com/indica/northern-lights -H accept:application/json
 
 ## Install requirements
 
-$ pip install -r requirements.txt
+  $ pip install -r requirements.txt
 
 ## Dump
 
 Crawl json data
 
-$ python dump.py
+  $ python main.py --dump --path strains.db
 
 ## Build Graph
 
+  $ python main.py --graph --path strains.db 
+
 ## Padagraph Bot
+
+  $ python main.py --graph --path strains.db --star 100 --post strains --key `cat ../public.io`
+
+
+### Get a Token
+
+* Log into http://padagraph.io,
+* Get your key from http://padagraph.io/account/me/generate_auth_token
+* Save it in a txt file `token.txt`
+
+### Post graph
+
+  $ python main.py  --graph --path strains.db --star 100 --post strains --key `cat ../token.txt`
 
