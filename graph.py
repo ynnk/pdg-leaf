@@ -2,8 +2,11 @@ import shelve
 
 path = "./strains.db"
 
-STRAIN_PROPS = [ 'sativa', 'name', 'indica', 'url', 'urlname', 'symbol', 'abstract',
-                 'shape', 'label']
+STRAIN_TEXT_PROPS = [ 'label', 'shape', 'image', 'video',            
+                 'name','url', 'urlname', 'symbol', 'abstract', 'heroimage',
+                 'indica', 'sativa', 'height', 'rating'
+                ]
+STRAIN_MULTI_PROPS = ['Flavors', 'Effects' , 'NegativeEffects', 'GeneralEffects', 'MedicalEffects', 'Symptoms']
 STRAIN_TYPES = dict([ ('Indica', 'circle'),('Sativa','triangle'),( 'Hybrid', 'square') ])
 
 
@@ -23,22 +26,33 @@ def parse(path):
 
     for row in db.itervalues():
         if 'page' in row:
-            
-            strain = {
-                        'name' : row['Name'],
-                        'label' : row['UrlName'],
+            model = row['page']['Model']
+            strain = model['Strain']
+            props = {
+                        'label'   : row['UrlName'],
+                        'shape'   : STRAIN_TYPES[row['Category']], 
+
                         'urlname' : row['UrlName'],
-                        'symbol' : row['Symbol'], 
-                        'category' : row['Category'], 
-                        'shape' : STRAIN_TYPES[row['Category']], 
-                        'url' : "%s/%s" % ( row['Category'], row['UrlName'] ) , 
-                        'abstract' : row['page'].get('Abstract', ""),
-                        'indica' : row['page'].get('PercentIndica', ""),
-                        'sativa' : row['page'].get('PercentSativa', ""),
-                        'parents' : row['page']['Model']['Strain'].get('Parents', []),
+                        'symbol'  : row['Symbol'], 
+                        'name'    : row['Name'],
+                        'category': row['Category'], 
+                        'url'     : "%s/%s" % ( row['Category'], row['UrlName'] ) , 
+                        'image'    : 'https://d3ix816x6wuc0d.cloudfront.net/%s/%s/badge?width=340' % ( row['Category'], row['UrlName'] ) ,
+
+                        'heroimage': strain.get('HeroImage',''),
+                        'video'    : strain.get('VideoUrl',''),
+                        'rating'   : strain.get('Rating',''),
+                        'height'   : strain.get('Height',''),
+                        'indica'   : strain.get('PercentIndica', ""),
+                        'sativa'   : strain.get('PercentSativa', ""),
+                        'abstract' : strain.get('Abstract', ""),
+                        'parents'  : strain.get('Parents', []),
+
                     }
+
+            props.update({ s : [ e['Name'] for e in model[s] ] for s in STRAIN_MULTI_PROPS })
                     
-            strains[strain['urlname']] = strain
+            strains[props['urlname']] = props
 
         else : print "ERROR", row 
     
@@ -81,8 +95,11 @@ def to_graph(strains, star=0):
     
     at = lambda x : vidx[x]
     edges = [ (at(e['Slug']), at(v['urlname']) ) for v in vs for e in v['parents']   ]
-    es = dict(zip( edges , [0] * len(edges) ))
-   
+
+    #for v in vs :
+        #for e in v['parents'] :
+            #print e['Slug'], "has_child", v['urlname']
+    
     ettrs = {}
     
     graph = igraph.Graph(directed= False, 
@@ -98,9 +115,7 @@ def to_graph(strains, star=0):
         # Extract n prox vertex
         cut = star; length = 50
         extract = prox_markov_dict(graph, range(graph.vcount()), length, add_loops=True)
-        print "star" , star, extract
         subvs =  [ i for i,v in sortcut(extract,cut)]
-
         g = graph.subgraph( subvs )
         starred = (g.vs["label"])
 
@@ -133,27 +148,22 @@ def post(gid, graph, strains, host, key, star=0):
     nodetypes = { n['name']:n for n in schema['nodetypes'] }
     edgetypes = { e['name']:e for e in schema['edgetypes'] }
 
-    print "\n nodetypes: ", nodetypes.keys()
-    print "\n edgetypes: ", edgetypes.keys()
-
     for k,v in STRAIN_TYPES.iteritems():
         if not k in nodetypes:
-            props = {  e : Text() for e in STRAIN_PROPS }
-            print k,v
+            props = {  e : Text() for e in STRAIN_TEXT_PROPS }
+            props.update({ e : Text(multi=True, uniq=True) for e in STRAIN_MULTI_PROPS })
+            print " * Creating node type `%s` strain" % k
             bot.post_nodetype(gid, k,  "%s strain"% v , props)
 
     if not "has_child" in edgetypes:
-        print "\n\n * Creating edge type %s" % "has_parent"
-        bot.post_edgetype(gid, "has_child", "strain has another strain as child", {"a":Text()})
+        print " * Creating edge type %s" % "has_child"
+        bot.post_edgetype(gid, "has_child", "strain has another strain as child", {})
 
     schema = bot.get_schema(gid)['schema']
     nodetypes = { n['name']:n for n in schema['nodetypes'] }
     edgetypes = { e['name']:e for e in schema['edgetypes'] }
 
-    print nodetypes
-    print edgetypes
-
-    print "* Posting nodes"
+    print " * Posting nodes"
 
     idx = {}
     fail = 0; count = 0
@@ -164,9 +174,10 @@ def post(gid, graph, strains, host, key, star=0):
         for vertex in graph.vs:
             _id = vertex['label']
             strain = strains[_id]
+            keys = STRAIN_TEXT_PROPS + STRAIN_MULTI_PROPS
             yield {
                 'nodetype': nodetypes[strain['category']]['uuid'],
-                'properties': { k: strain[k] for k in STRAIN_PROPS } 
+                'properties': { k: strain[k] for k in keys } 
                }
                
     for node, uuid in bot.post_nodes( gid, gen_nodes() ):
@@ -178,15 +189,15 @@ def post(gid, graph, strains, host, key, star=0):
             if node['properties']['label'] in to_star :
                 to_star_uuids.add(uuid)
                 
-    print "%s (%s failed) nodes inserted " % (count, fail)
+    print "   %s (%s failed) nodes inserted " % (count, fail)
 
-    print "* Starring %s nodes" % len(to_star_uuids)
+    print " * Starring %s nodes" % len(to_star_uuids)
     print to_star
     bot.star_nodes(gid, list(to_star_uuids))
 
 
     
-    print "* Posting edges"
+    print " * Posting edges"
 
     inv_idx = { v:k for k,v in idx.iteritems() }
     fail = 0; count = 0
@@ -212,4 +223,4 @@ def post(gid, graph, strains, host, key, star=0):
             fail += 1
         else :
             count += 1
-    print "%s (%s failed) edges inserted " % (count, fail)
+    print "   %s (%s failed) edges inserted " % (count, fail)

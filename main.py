@@ -4,7 +4,7 @@
 USAGE = """
 dumps data from https://www.leafly.com
 
-$ python main.py --dump --path db.path
+
 
 """
 import sys
@@ -18,14 +18,12 @@ def main():
     parser.add_argument("--path", action='store',help="db path to store dump")
 
     parser.add_argument("--dump", action='store_true', default=False, help="dump")
-
-    parser.add_argument("--parse", action='store_true', default=False, help="parse")
     
     parser.add_argument("--graph", action='store_true', default=False, help="create an summaryze with igraph")
 
     parser.add_argument("--star", action='store', type=int, default=0, help="star n prox nodes")
 
-    parser.add_argument("--post", action='store', help="post to padagraph", default="")
+    parser.add_argument("--post", action='store', help="--post graphname ", default="")
     parser.add_argument("--host", action='store', help="host", default="http://padagraph.io")
     parser.add_argument("--key", action='store', help="token", default=None)
     
@@ -39,10 +37,8 @@ def main():
         strains = dump.expand_strains(strains)
         dump.saveAs(strains, args.path)
     
-    if args.parse: 
-        strains = graph.parse(args.path)
-
     if args.graph:
+        strains = graph.parse(args.path)
         sgraph = graph.to_graph(strains, star=args.star)
         
     if len(args.post):
