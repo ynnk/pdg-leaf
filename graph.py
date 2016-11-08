@@ -68,13 +68,12 @@ def parse(path):
                 else :
                     print strain['urlname'], p['Slug']
 
-    # print some stuff
-    print( "parents",  with_parents, len(p_strains))
+    #print( "parents",  with_parents, len(p_strains))
     l1 = list(set(p_strains.values()))
-    print len(l1), sorted(l1)[-10:]
+    #print len(l1), sorted(l1)[-10:]
     s1 =  set(p_strains.keys()).difference(set(strains.keys()))
     s2 =  set(strains.keys()).difference(set(p_strains.keys()))
-    print len(s1), len(s2), s1 
+    #print len(s1), len(s2), s1 
 
     print( "len", len(strains),
            len(set([ e['urlname'] for e in strains.itervalues()]))
@@ -96,13 +95,14 @@ def to_graph(strains, star=0):
     at = lambda x : vidx[x]
     edges = [ (at(e['Slug']), at(v['urlname']) ) for v in vs for e in v['parents']   ]
 
+
     #for v in vs :
         #for e in v['parents'] :
-            #print e['Slug'], "has_child", v['urlname']
+            #print e['Slug'], at(e['Slug']), "has_child", v['urlname'] , at(v['urlname']) 
     
     ettrs = {}
     
-    graph = igraph.Graph(directed= False, 
+    graph = igraph.Graph(directed=True, 
                      graph_attrs={},
                      n=len(invidx),
                      vertex_attrs=vattrs,
@@ -111,10 +111,11 @@ def to_graph(strains, star=0):
                      
     print graph.summary()
 
+
     if star:
         # Extract n prox vertex
         cut = star; length = 50
-        extract = prox_markov_dict(graph, range(graph.vcount()), length, add_loops=True)
+        extract = prox_markov_dict(graph, range(graph.vcount()), length,mode=ALL, add_loops=True)
         subvs =  [ i for i,v in sortcut(extract,cut)]
         g = graph.subgraph( subvs )
         starred = (g.vs["label"])
@@ -163,18 +164,21 @@ def post(gid, graph, strains, host, key, star=0):
     nodetypes = { n['name']:n for n in schema['nodetypes'] }
     edgetypes = { e['name']:e for e in schema['edgetypes'] }
 
-    print " * Posting nodes"
 
     idx = {}
     fail = 0; count = 0
     to_star = set([ v['label'] for v in graph.vs if v['starred']  ][:star] )
     to_star_uuids = set()
+    print to_star
      
+    print " * Posting nodes"
     def gen_nodes():
+
+        keys = STRAIN_TEXT_PROPS + STRAIN_MULTI_PROPS
+
         for vertex in graph.vs:
             _id = vertex['label']
             strain = strains[_id]
-            keys = STRAIN_TEXT_PROPS + STRAIN_MULTI_PROPS
             yield {
                 'nodetype': nodetypes[strain['category']]['uuid'],
                 'properties': { k: strain[k] for k in keys } 
@@ -185,30 +189,28 @@ def post(gid, graph, strains, host, key, star=0):
             fail += 1
         else :
             count += 1
-            idx[node['properties']['label']] = uuid
-            if node['properties']['label'] in to_star :
+            label = node['properties']['label']
+            idx[label] = uuid
+            if label in to_star :
                 to_star_uuids.add(uuid)
                 
     print "   %s (%s failed) nodes inserted " % (count, fail)
 
     print " * Starring %s nodes" % len(to_star_uuids)
-    print to_star
     bot.star_nodes(gid, list(to_star_uuids))
 
 
-    
     print " * Posting edges"
-
     inv_idx = { v:k for k,v in idx.iteritems() }
     fail = 0; count = 0
 
     def gen_edges():
         for edge in graph.es:
-            src = graph.vs[edge.source]['label']
-            src = idx[src]
+            _src = graph.vs[edge.source]['label']
+            src = idx[_src]
 
-            tgt = graph.vs[edge.target]['label']
-            tgt = idx[tgt]
+            _tgt = graph.vs[edge.target]['label']
+            tgt = idx[_tgt]
             
             yield {
                     'edgetype': edgetypes['has_child']['uuid'],
