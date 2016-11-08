@@ -30,9 +30,6 @@ Crawl json data
 
 ## Padagraph Bot
 
-    $ python main.py --graph --path strains.db --star 100 --post strains --key `cat ../public.io`
-
-
 ### Get a Token
 
 * Log into http://padagraph.io,
