@@ -42,7 +42,8 @@ def main():
         sgraph = graph.to_graph(strains, star=args.star)
         
     if len(args.post):
-        graph.post(args.post, sgraph, strains, args.host, args.key, star=args.star)
+        key = open(args.key, 'r').read().strip()
+        graph.post(args.post, sgraph, strains, args.host, key, star=args.star)
         
         
 if __name__ == '__main__':

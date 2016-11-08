@@ -29,7 +29,7 @@ def parse(path):
             model = row['page']['Model']
             strain = model['Strain']
             props = {
-                        'label'   : row['UrlName'],
+                        'label'   : row['UrlName'].replace('-', ' '),
                         'shape'   : STRAIN_TYPES[row['Category']], 
 
                         'urlname' : row['UrlName'],
@@ -87,9 +87,14 @@ def to_graph(strains, star=0):
     from cello.graphs.prox import prox_markov_dict, sortcut, ALL
 
     vs = strains.values()
-    invidx = sorted([ v['urlname'] for v in vs ])
-    vidx = dict( (e,i) for i,e in enumerate(invidx) )
-    vattrs = { 'label': [ v.encode('UTF8') for v in invidx] }
+    #invidx = sorted([ v['urlname'] for v in vs ])
+    vattrs = {
+     'label': [ v['label'].encode('UTF8') for v in vs],
+     'urlname': [ v['urlname'].encode('UTF8') for v in vs]
+             }
+
+    vidx = dict( (v['urlname'],i) for i,v in enumerate(vs) )
+    invidx = [ v['urlname'] for v in vs ]
     starred = []
     
     at = lambda x : vidx[x]
@@ -108,6 +113,9 @@ def to_graph(strains, star=0):
                      vertex_attrs=vattrs,
                      edges=edges,
                      edge_attrs=ettrs)
+
+    
+    #graph = graph.clusters().giant()
                      
     print graph.summary()
 
@@ -133,8 +141,11 @@ def post(gid, graph, strains, host, key, star=0):
 
     bot = Botagraph(host, key)
 
-
     print gid, "exists",  bot.has_graph(gid)
+
+    
+    if bot.has_graph(gid) :
+        bot.delete_graph(gid)
     
     if not bot.has_graph(gid) :
         print "\n * Create graph %s" % gid
@@ -167,7 +178,7 @@ def post(gid, graph, strains, host, key, star=0):
 
     idx = {}
     fail = 0; count = 0
-    to_star = set([ v['label'] for v in graph.vs if v['starred']  ][:star] )
+    to_star = set([ v['urlname'] for v in graph.vs if v['starred']  ][:star] )
     to_star_uuids = set()
     print to_star
      
@@ -177,7 +188,7 @@ def post(gid, graph, strains, host, key, star=0):
         keys = STRAIN_TEXT_PROPS + STRAIN_MULTI_PROPS
 
         for vertex in graph.vs:
-            _id = vertex['label']
+            _id = vertex['urlname']
             strain = strains[_id]
             yield {
                 'nodetype': nodetypes[strain['category']]['uuid'],
@@ -189,15 +200,15 @@ def post(gid, graph, strains, host, key, star=0):
             fail += 1
         else :
             count += 1
-            label = node['properties']['label']
-            idx[label] = uuid
-            if label in to_star :
+            key  = node['properties']['urlname']
+            idx[key] = uuid
+            if key in to_star :
                 to_star_uuids.add(uuid)
                 
     print "   %s (%s failed) nodes inserted " % (count, fail)
 
     print " * Starring %s nodes" % len(to_star_uuids)
-    bot.star_nodes(gid, list(to_star_uuids))
+    bot.star_nodes(gid, iter(list(to_star_uuids)))
 
 
     print " * Posting edges"
@@ -206,10 +217,10 @@ def post(gid, graph, strains, host, key, star=0):
 
     def gen_edges():
         for edge in graph.es:
-            _src = graph.vs[edge.source]['label']
+            _src = graph.vs[edge.source]['urlname']
             src = idx[_src]
 
-            _tgt = graph.vs[edge.target]['label']
+            _tgt = graph.vs[edge.target]['urlname']
             tgt = idx[_tgt]
             
             yield {
