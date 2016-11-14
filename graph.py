@@ -2,8 +2,8 @@ import shelve
 
 path = "./strains.db"
 
-STRAIN_TEXT_PROPS = [ 'label', 'shape', 'image', 'video',            
-                 'name','url', 'urlname', 'symbol', 'abstract', 'heroimage',
+STRAIN_TEXT_PROPS = [ 'label', 'shape', 'image', 'video',          
+                 'name','url', 'urlname', 'symbol', 'parents', 'abstract', 'heroimage',
                  'indica', 'sativa', 'height', 'rating'
                 ]
 STRAIN_MULTI_PROPS = ['Flavors', 'Effects' , 'NegativeEffects', 'GeneralEffects', 'MedicalEffects', 'Symptoms']
@@ -47,12 +47,12 @@ def parse(path):
                         'sativa'   : strain.get('PercentSativa', ""),
                         'abstract' : strain.get('Abstract', ""),
                         'parents'  : strain.get('Parents', []),
-
                     }
-
+            props['parents'] = [ e['Slug'] for e in props['parents'] ]
             props.update({ s : [ e['Name'] for e in model[s] ] for s in STRAIN_MULTI_PROPS })
                     
             strains[props['urlname']] = props
+            #print props['urlname'],props['parents']
 
         else : print "ERROR", row 
     
@@ -61,12 +61,11 @@ def parse(path):
         if len(parents):
             with_parents += 1
             for p in parents:
-                _id = p['Slug']
                 #if name in syns: name = syns[name]
-                if _id in strains:
-                    p_strains[_id] = p_strains.get( _id , 0) + 1
+                if p in strains:
+                    p_strains[p] = p_strains.get( p , 0) + 1
                 else :
-                    print strain['urlname'], p['Slug']
+                    print strain['urlname'], p
 
     #print( "parents",  with_parents, len(p_strains))
     l1 = list(set(p_strains.values()))
@@ -98,8 +97,10 @@ def to_graph(strains, star=0):
     starred = []
     
     at = lambda x : vidx[x]
-    edges = [ (at(e['Slug']), at(v['urlname']) ) for v in vs for e in v['parents']   ]
+    edges = [ (at(e), at(v['urlname']) ) for v in vs for e in v['parents']   ]
+    #edge_types = [ for v in vs for e in v['parents']   ]
 
+    print("len edges", len(edges))
 
     #for v in vs :
         #for e in v['parents'] :
@@ -114,7 +115,9 @@ def to_graph(strains, star=0):
                      edges=edges,
                      edge_attrs=ettrs)
 
-    
+    print graph.summary()
+
+    #print("clusters", graph.clusters()[10])
     #graph = graph.clusters().giant()
                      
     print graph.summary()
@@ -126,8 +129,9 @@ def to_graph(strains, star=0):
         extract = prox_markov_dict(graph, range(graph.vcount()), length,mode=ALL, add_loops=True)
         subvs =  [ i for i,v in sortcut(extract,cut)]
         g = graph.subgraph( subvs )
-        starred = (g.vs["label"])
-
+        starred = set(g.vs["label"])
+        graph = g
+    
     graph.vs['starred'] = [ v in starred for v in graph.vs['label'] ]
     print starred
     
@@ -226,7 +230,7 @@ def post(gid, graph, strains, host, key, star=0):
             yield {
                     'edgetype': edgetypes['has_child']['uuid'],
                     'source': src,
-                    'label' : "has_child",
+                    'label' : "-",
                     'target': tgt,
                     'properties': {}
                   }
